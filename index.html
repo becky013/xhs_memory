@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>银发回忆录 · 双端协同一屏演示</title>
+<style>
+:root{
+  --paper:#fbf8f3;--white:#fffdf9;--ink:#3e3128;--muted:#63574a;--line:#e9dfd0;
+  --red:#9a4b2b;--red-d:#7d3b22;--green:#5a7050;--tan:#a87e54;
+  --serif:'Noto Serif SC','Songti SC',serif;--sans:-apple-system,'PingFang SC',sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--sans);background:#ece4d4;color:var(--ink);position:relative}
+/* 设计台固定 1560×1040，窗口不足时整体等比缩放居中（手机本身始终 1.5× 不变形） */
+#zoom{position:absolute;left:50%;top:0;transform-origin:top center;width:1560px;height:1040px;display:flex;flex-direction:column}
+/* ===== 顶栏 ===== */
+.topbar{flex:none;display:flex;align-items:center;gap:9px;padding:8px 20px;background:linear-gradient(160deg,#fbf8f3,#f1e5d3);border-bottom:1px solid var(--line)}
+.topbar h1{font-family:var(--serif);font-size:15px;letter-spacing:1px;white-space:nowrap}
+.topbar h1 i{font-style:normal;background:var(--red);color:#fffdf9;border-radius:6px;padding:1px 7px;margin-right:6px;font-size:12px}
+.nodes{display:flex;gap:6px;flex-wrap:wrap}
+.nodebtn{border:1px solid var(--line);background:var(--white);border-radius:16px;padding:6px 11px;font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--ink);transition:all .2s;white-space:nowrap}
+.nodebtn b{width:16px;height:16px;border-radius:50%;background:#d8c9b4;color:#fff;display:grid;place-items:center;font-size:9.5px}
+.nodebtn.on{background:var(--red);border-color:var(--red);color:#fffdf9;box-shadow:0 4px 12px #9a4b2b44}
+.nodebtn.on b{background:#fffdf9;color:var(--red)}
+.nodebtn.free.on{background:var(--green);border-color:var(--green)}
+.nodebtn.free.on b{color:var(--green)}
+#autoplay{margin-left:auto;border:0;background:var(--ink);color:#fffdf9;border-radius:16px;padding:7px 15px;font-size:11.5px;cursor:pointer;white-space:nowrap}
+#autoplay.playing{background:var(--red)}
+/* 步骤条 */
+.stepbar{flex:none;display:flex;align-items:center;gap:10px;padding:6px 22px;background:#f6efe2;border-bottom:1px solid var(--line);font-size:11px}
+.stepbar .st-name{font-weight:700;color:var(--red);white-space:nowrap}
+.stepbar .st-side{flex:none;font-size:9.5px;border-radius:9px;padding:2px 8px;background:#e8dcc4;color:#6b5426}
+.stepbar .dots{display:flex;gap:5px}
+.stepbar .dots i{width:7px;height:7px;border-radius:50%;background:#d8c9b4}
+.stepbar .dots i.on{background:var(--red)}
+.stepbar .agent{margin-left:auto;color:var(--tan);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44%}
+.stepbar .agent b{color:var(--red)}
+.stepbar .nav{border:1px solid var(--line);background:var(--white);border-radius:12px;padding:3px 10px;font-size:11px;cursor:pointer}
+/* ===== 主区三栏 ===== */
+.stage3{flex:1;min-height:0;display:grid;grid-template-columns:414px minmax(380px,1fr) 414px;gap:20px;padding:8px 22px 10px;justify-content:center}
+.sidecol{position:relative;display:flex;flex-direction:column;min-height:0;gap:6px;align-items:center}
+.who{flex:none;width:100%;display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;background:var(--white);border:1px solid var(--line);border-radius:10px;padding:4px 10px}
+.who img{width:20px;height:20px;border-radius:50%;object-fit:cover}
+.who small{color:var(--muted);font-weight:400;margin-left:auto;font-size:9.5px}
+/* iPhone 高保真壳 —— 固定尺寸 1.5×（414×840），不随窗口缩放 */
+.iphone{flex:none;width:414px;height:840px;position:relative;border-radius:64px;background:linear-gradient(135deg,#0d0e10,#3a3b3e 45%,#141516 65%,#55555a);padding:10px;box-shadow:0 26px 60px #2a201866,0 0 0 1px #5c5c60;transition:opacity .35s,filter .35s;overflow:visible}
+.iphone.dim{opacity:.45;filter:saturate(.6)}
+.iphone:before,.iphone:after{content:"";position:absolute;background:#343438;width:4px;border-radius:3px;left:-3px}
+.iphone:before{top:150px;height:62px}.iphone:after{top:228px;height:98px}
+.iphone .scr{position:relative;width:100%;height:100%;border-radius:54px;overflow:hidden;background:var(--paper)}
+.iphone .island{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:110px;height:30px;border-radius:15px;background:#0d0e10;z-index:40;pointer-events:none}
+.iphone iframe{position:absolute;left:50%;top:50%;width:410px;height:866px;border:0;transform:translate(-50%,-50%) scale(0.947);transform-origin:center}
+/* JTBD · storyboard 一段话 */
+.jtbd{flex:none;width:100%;background:var(--white);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:11.5px;line-height:1.75;color:var(--muted)}
+.jtbd b{color:var(--red)}
+/* 悬浮标注：挂在手机靠中间栏一侧（不遮挡 App 界面），白底无边框；连线末端动效圆点精确指向屏幕上的功能 */
+.anno{position:absolute;z-index:30;background:#fff;border:0;border-radius:10px;padding:7px 10px;font-size:11px;line-height:1.55;color:#5c4a2a;box-shadow:0 10px 26px #6b4f3440;width:150px;animation:annoIn .4s ease both}
+.anno b{color:var(--red);display:block;font-size:11.5px;margin-bottom:1px}
+@keyframes annoIn{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+.anno.out-r{left:calc(100% + 12px)}
+.anno.out-l{right:calc(100% + 12px)}
+.hitdot{position:absolute;z-index:29;width:13px;height:13px;border-radius:50%;background:var(--red);border:2.5px solid #fff;transform:translate(-50%,-50%);animation:dotPulse 1.6s ease-out infinite;pointer-events:none}
+@keyframes dotPulse{0%{box-shadow:0 0 0 0 #9a4b2b77}70%{box-shadow:0 0 0 13px #9a4b2b00}100%{box-shadow:0 0 0 0 #9a4b2b00}}
+.conn{position:absolute;inset:0;z-index:28;pointer-events:none;overflow:visible}
+.conn line{stroke:#c8a35e;stroke-width:2}
+/* ===== 中间栏 ===== */
+.centercol{display:flex;flex-direction:column;min-height:0;gap:5px}
+.chead{flex:none;text-align:center}
+.chead h2{font-family:var(--serif);font-size:13.5px}
+.chead small{font-size:9px;color:var(--muted)}
+.io-row{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.io{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font-size:9.5px;line-height:1.5;box-shadow:0 3px 9px #6b4f340d}
+.io h4{font-size:9.5px;margin-bottom:2px;display:flex;align-items:center;gap:5px}
+.io h4 img{width:14px;height:14px;border-radius:50%;object-fit:cover}
+.io .quote{border-left:3px solid var(--red);padding-left:6px;font-family:var(--serif);font-size:9.5px}
+.io .note{margin-top:3px;background:#f7f0e2;border-radius:6px;padding:2px 6px;font-size:8.5px;color:#6b5426}
+.io .ag{margin-top:3px;font-size:8px;color:var(--tan);border-top:1px dashed var(--line);padding-top:2px}
+.io .ag b{color:var(--red)}
+/* 小忆指令层：左卡箭头朝左指向讲述端，右卡箭头朝右指向协助端 */
+.xyrow{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.xy{position:relative;background:#f4eedd;border:1px dashed #d5c29a;border-radius:10px;padding:5px 9px;font-size:9px;line-height:1.5;color:#5c4a2a}
+.xy h5{font-size:9px;color:var(--red);display:flex;align-items:center;gap:5px;margin-bottom:1px}
+.xy h5 i{font-style:normal;width:13px;height:13px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:8px}
+.xy b{color:var(--red-d)}
+.xy .ag{margin-top:2px;font-size:8px;color:var(--tan);border-top:1px dashed #d5c29a;padding-top:2px}
+.xy.l:before{content:"←";position:absolute;left:-22px;top:50%;transform:translateY(-50%);color:var(--red);font-size:15px;font-weight:700}
+.xy.r:after{content:"→";position:absolute;right:-22px;top:50%;transform:translateY(-50%);color:var(--red);font-size:15px;font-weight:700}
+.merge{flex:none;display:flex;align-items:center;gap:8px;color:var(--tan);font-size:9px;letter-spacing:.14em;min-height:14px;transition:opacity .5s}
+.merge:before,.merge:after{content:"";flex:1;height:1.5px;background:repeating-linear-gradient(90deg,#c8a35e 0 6px,transparent 6px 12px)}
+.merge span{display:inline-block}
+.merge.dissolve:before,.merge.dissolve:after{display:none}
+.merge.dissolve span{animation:fly .9s ease-in forwards;animation-delay:var(--dl)}
+.merge.gone{display:none}
+@keyframes fly{to{transform:translate(var(--tx),var(--ty)) rotate(var(--rt));opacity:0}}
+/* 纸张文稿 */
+.paper{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;background:linear-gradient(175deg,#fffdf6,#faf3e6);border:1px solid #e2d4ba;border-radius:12px;padding:10px 14px 9px;box-shadow:0 8px 22px #6b4f3414;position:relative}
+.paper:before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:3px;background:var(--red)}
+.paper .phead{position:sticky;top:-10px;background:linear-gradient(#fffdf6 80%,transparent);padding:1px 0 5px;z-index:2}
+.paper h4{font-family:var(--serif);font-size:12.5px}
+.paper .meta{font-size:8.5px;color:var(--muted);margin-top:2px}
+.paper .cnt{position:absolute;right:10px;top:8px;font-size:8.5px;color:var(--green);background:#e6ecdf;border-radius:8px;padding:2px 7px}
+.paper p{font-family:var(--serif);font-size:11px;line-height:1.8;text-indent:2em;color:#40342a;text-align:justify;margin-top:5px}
+.paper .pphoto{width:100%;border-radius:8px;margin-top:8px;display:block;box-shadow:0 3px 10px #6b4f3422}
+.paper .pcap{font-size:8.5px;color:var(--muted);text-align:center;margin-top:3px}
+.paper .mark{background:#f3e2c8;border-radius:4px;padding:0 3px}
+.paper .todo{background:#fbe9e2;border-radius:4px;padding:0 3px;color:#8d3f22}
+.paper .foot{margin-top:8px;font-size:9px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}
+.paper.flash{animation:paperFlash 1.2s ease}
+@keyframes paperFlash{0%{box-shadow:0 0 0 0 #9a4b2b66}60%{box-shadow:0 0 0 12px #9a4b2b22}100%{box-shadow:0 8px 22px #6b4f3414}}
+.paper .skeleton{color:var(--muted);font-size:11px;text-align:center;padding:18px 0 8px;line-height:2}
+.paper .skeleton b{color:var(--tan)}
+.source-legend{display:flex;gap:12px;margin:10px 0 8px;font-size:9px;color:var(--muted)}
+.source-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.source-father{background:#f4dfc9;color:#763d24;border-radius:4px;padding:1px 3px}
+.source-helper{background:#dce9ed;color:#285569;border-radius:4px;padding:1px 3px}
+.micro-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin:8px 0}
+.micro-card small{font-size:9px;color:var(--muted)}
+.micro-card p{font-size:13px;line-height:1.9;text-indent:0;margin-top:6px;text-align:left}
+.micro-card.waiting{border-style:dashed;color:var(--muted);font-size:10px}
+/* 立体书（成册阶段）：摊开的左右两页，完整正文，打开后不再动 */
+.paper.bookmode{padding:6px}
+.bookwrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:6px 0}
+.book3d{position:relative;width:600px;height:438px;perspective:2000px;transform-style:preserve-3d;transform:translateX(-150px);animation:bookIn .65s ease;transition:transform 2.1s ease-in-out}
+@keyframes bookIn{from{opacity:0;transform:translate(-150px,26px) scale(.85)}to{opacity:1;transform:translateX(-150px)}}
+.book3d.open{transform:translateX(0)}
+.book3d:before{content:"";position:absolute;left:50%;top:0;bottom:0;width:14px;transform:translateX(-50%);background:linear-gradient(90deg,transparent,#8a6f4d33 40%,#6b4f3450 50%,#8a6f4d33 60%,transparent);z-index:6;pointer-events:none;opacity:0;transition:opacity .5s ease .9s}
+.book3d.open:before{opacity:1}
+.book-leaf{position:absolute;left:300px;top:0;width:300px;height:100%;transform-style:preserve-3d;transform-origin:left center;z-index:8;transition:transform 2.1s ease-in-out}
+.book3d.open .book-leaf{transform:rotateY(-180deg)}
+.bcover,.bpage{position:absolute;top:0;bottom:0;backface-visibility:hidden}
+.bcover{left:0;width:100%;border-radius:6px 14px 14px 6px;background:linear-gradient(150deg,#8d4326,#6f3120 60%,#5d2a1b);color:#f5e7cf;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;border-left:12px solid #4e2317;box-shadow:4px 6px 22px #6b4f3438}
+.bcover .seal{width:40px;height:40px;border-radius:10px;background:#f5e7cf;color:#8d4326;display:grid;place-items:center;font-family:var(--serif);font-size:22px}
+.bcover h3{font-family:var(--serif);font-size:22px;letter-spacing:6px;writing-mode:vertical-rl;margin:0}
+.bcover small{font-size:9.5px;letter-spacing:2px;opacity:.85}
+.bpage{background:linear-gradient(175deg,#fffdf6,#faf3e6);padding:16px 18px;font-family:var(--serif);font-size:9.8px;line-height:1.74;color:#40342a;overflow:hidden;box-shadow:2px 4px 16px #6b4f3428;opacity:0;transition:opacity .5s ease .8s}
+.book3d.open .bpage{opacity:1}
+.bpage.bleft{left:0;width:100%;border-radius:5px 0 0 5px;border-right:1px solid #e6d8bf;transform:rotateY(180deg);opacity:1}
+.bpage.bright{left:300px;width:300px;border-radius:0 5px 5px 0;border-left:1px solid #e6d8bf}
+.bpage img{width:100%;border-radius:5px;display:block}
+.bpage h5{font-size:11.5px;margin-bottom:4px}
+.bpage p{text-indent:2em;text-align:justify;margin-top:4px}
+.bpage .cap{font-size:7.5px;color:var(--muted);text-align:center;font-family:var(--sans);margin-top:2px}
+.bpage .foot2{margin-top:6px;font-size:8px;color:var(--muted);border-top:1px dashed var(--line);padding-top:4px;font-family:var(--sans)}
+</style>
+</head>
+<body>
+<div id="zoom">
+<div class="topbar">
+  <h1><i>忆</i>银发回忆录 · 双端协同</h1>
+  <div class="nodes" id="nodes"></div>
+  <button id="autoplay">▶ 自动演示全流程</button>
+</div>
+<div class="stepbar">
+  <button class="nav" id="prev">‹</button>
+  <span class="st-name" id="stName"></span>
+  <span class="st-side" id="stSide"></span>
+  <div class="dots" id="dots"></div>
+  <button class="nav" id="next">›</button>
+  <span class="agent" id="agentNote"></span>
+</div>
+
+<div class="stage3">
+  <div class="sidecol" id="colL">
+    <div class="who"><img src="银发回忆录_双端协同App/assets/narrator.png" alt="">讲述端 · 陈建华（父 · 72 岁）<small>素材/经历/广场/我的</small></div>
+    <div class="iphone" id="phL"><div class="island"></div><div class="scr"><iframe id="fL" src="银发回忆录_双端协同App/app.html?fresh=1" title="讲述端 App"></iframe></div></div>
+    <div class="jtbd" id="jtbdL"></div>
+  </div>
+
+  <div class="centercol">
+    <div class="chead"><h2>《工作回忆》第二章 · 第一个出口订单</h2><small>两端输入 → 小忆指令 → 合成文稿 → 成册</small></div>
+    <div class="io-row">
+      <div class="io" id="ioL"></div>
+      <div class="io" id="ioR"></div>
+    </div>
+    <div class="xyrow">
+      <div class="xy l" id="xyL"></div>
+      <div class="xy r" id="xyR"></div>
+    </div>
+    <div class="merge" id="mergeTxt">小忆合成 · 待确认项不进正文</div>
+    <div class="paper" id="paper"></div>
+  </div>
+
+  <div class="sidecol" id="colR">
+    <div class="who"><img src="银发回忆录_双端协同App/assets/role-helper.png" alt="">协助端 · 陈思颖（女 · 30 岁）<small>进度/经历/广场/编辑</small></div>
+    <div class="iphone" id="phR"><div class="island"></div><div class="scr"><iframe id="fR" src="银发回忆录_双端协同App/app.html?fresh=1" title="协助端 App"></iframe></div></div>
+    <div class="jtbd" id="jtbdR"></div>
+  </div>
+</div>
+</div>
+
+<script>
+/* 设计台 1560×1040，窗口放不下时整体等比缩放 */
+function fitZoom(){const z=document.getElementById('zoom');const s=Math.min(1,innerWidth/1580,innerHeight/1060);z.style.transform=`translateX(-50%) scale(${s})`;}
+addEventListener('resize',fitZoom);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)fitZoom();});
+fitZoom();setTimeout(fitZoom,300);setTimeout(fitZoom,1200);
+
+/* ===== iframe 去壳 + 双通道驱动 ===== */
+const STRIP=`.stage{padding:0!important;background:var(--paper)!important;min-height:100%}
+.stage-caption,.stage-note{display:none!important}
+.phone{width:410px!important;height:866px!important;max-width:none!important;padding:0!important;border-radius:0!important;background:none!important;box-shadow:none!important}
+.device-screen{border-radius:0!important}.dynamic-island{display:none!important}.status-bar{height:42px!important}`;
+const BRIDGE=`window.addEventListener('message',function(e){if(typeof e.data==='string'&&e.data.indexOf('##cmd##')===0){try{eval(e.data.slice(7))}catch(_){}}});`;
+function inject(f){try{const d=f.contentDocument;if(!d||d.getElementById('stripchrome'))return;
+  const s=d.createElement('style');s.id='stripchrome';s.textContent=STRIP;d.head.appendChild(s);
+  const b=d.createElement('script');b.textContent=BRIDGE;d.head.appendChild(b);}catch(e){}}
+function cmd(f,js){if(!js)return true;
+  try{f.contentWindow.eval(js);return true;}catch(e){}
+  try{f.contentWindow.postMessage('##cmd##'+js,'*');return true;}catch(e){}
+  return false;
+}
+/* 终极兜底：无法脚本控制 iframe 时（如 file:// 直开），改用 ?screen= URL 切页，App 原生支持 */
+const BASE={L:'银发回忆录_双端协同App/app.html?role=narrator',R:'银发回忆录_双端协同App/app.html?role=helper'};
+let SRC_MODE=null;
+function detectMode(f){if(SRC_MODE!==null)return;try{void f.contentDocument.body;SRC_MODE=false;}catch(e){SRC_MODE=true;}}
+function fallbackAction(js){
+  if(!js)return null;
+  const role=js.match(/memoDemo\.selectRole\('([^']+)'\)/);
+  if(role)return {action:'select-role',role:role[1]};
+  const repair=js.match(/memoDemo\.repair\((\d)\)/);
+  if(repair)return {action:'repair',stage:Number(repair[1])};
+  if(js.includes('memoDemo.saveRepair()'))return {action:'save-repair'};
+  if(js.includes('memoDemo.syncRepair()'))return {action:'sync-repair'};
+  const step=js.match(/memoDemo\.step\('([^']+)'\)/);
+  if(step)return {action:'step',id:step[1]};
+  if(js.includes('canvas-arrange'))return {action:'canvas-arrange'};
+  if(js.includes('canvas-generate'))return {action:'canvas-generate'};
+  return null;
+}
+function drive(f,side,js,scr){
+  if(SRC_MODE===null)detectMode(f);
+  if(SRC_MODE){
+    const action=fallbackAction(js);
+    const send=()=>{if(action)f.contentWindow.postMessage({memoDemo:action},'*');};
+    if(scr&&f.dataset.scr!==scr){f.dataset.scr=scr;f.addEventListener('load',send,{once:true});f.src=BASE[side]+'&screen='+scr;}
+    else send();
+    return true;
+  }
+  return cmd(f,js);
+}
+/* 每一步两端在兜底模式下要切的 screen 名 */
+const SCR={
+ '0-0':{},'0-1':{},'0-2':{},'0-3':{},
+ '1-0':{L:'home'},'1-1':{L:'people'},'1-2':{L:'person'},'1-3':{L:'person'},'1-4':{L:'record'},'1-5':{R:'home'},'1-6':{R:'repair'},'1-7':{R:'repair'},'1-8':{R:'repair'},'1-9':{R:'repair'},'1-10':{L:'home',R:'mphotos'},'1-11':{R:'home'},'1-12':{R:'sendclue'},'1-13':{L:'agent-demo-record'},'1-14':{L:'agent-demo-record'},'1-15':{R:'sendclue'},'1-16':{R:'sendclue'},
+ '2-0':{L:'agent-review',R:'home'},'2-1':{L:'agent-review'},'2-2':{L:'agent-review'},'2-3':{L:'agent-done'},'2-4':{L:'stories'},'2-5':{L:'stories'},'2-6':{L:'stories'},'2-7':{R:'draftview'},
+ '3-0':{L:'agent-done',R:'draftview'},
+ '4-0':{R:'canvas'},'4-1':{R:'canvas'},'4-2':{R:'canvas'},'4-3':{L:'books'},'4-4':{L:'fullpage'},'4-5':{L:'fullpage'},'4-6':{R:'books'},
+ '5-0':{L:'community'},'5-1':{L:'community'},'5-2':{L:'community'},'5-3':{L:'community'},'5-4':{R:'community'},
+ '6-0':{R:'order'},'6-1':{L:'order'},
+ '7-0':{L:'home',R:'home'}};
+
+/* 标注：连线末端动效圆点精确指向 App 真实元素（iframe 410×866 缩放 0.947 居中于 394×820 屏内），浮窗放在手机靠中间栏一侧 */
+const SC=0.947,OFFX=(394-410*SC)/2+10,OFFY=(820-866*SC)/2+10;
+const APPURL='银发回忆录_双端协同App/app.html?';
+let annoToken=0;
+function placeAnnos(f,phoneEl,list,out,quiet){
+  if(!list||!list.length)return 0;
+  let targets=[];
+  list.forEach(a=>{let el=null;try{el=f.contentDocument&&f.contentDocument.querySelector(a[0]);}catch(e){}targets.push(el);});
+  /* 第一个不在视口内的目标，先滚到屏幕中间再量位置 */
+  try{
+    const off=targets.find(el=>{if(!el)return false;const r=el.getBoundingClientRect();return r.bottom<0||r.top>866;});
+    if(off)off.scrollIntoView({block:'center'});
+  }catch(e){}
+  const svgNS='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(svgNS,'svg');svg.setAttribute('class','conn');
+  const right=out==='out-r';
+  const slots=[0.2,0.45,0.7];let fb=0,miss=0;
+  list.forEach((a,k)=>{
+    let dx=null,dy=null;const el=targets[k];
+    try{
+      if(el){const r=el.getBoundingClientRect();
+        if(r.width>0||r.height>0){dx=OFFX+(r.left+r.width/2)*SC;dy=OFFY+(r.top+r.height/2)*SC;}}
+    }catch(e){}
+    if(dx===null||isNaN(dx)){miss++;dx=right?370:44;dy=slots[fb++%3]*780;}
+    dx=Math.max(16,Math.min(398,dx));dy=Math.max(12,Math.min(808,dy));
+    const top=Math.max(6,Math.min(744,dy-16));
+    const card=document.createElement('div');
+    card.className='anno '+out;card.style.top=top+'px';
+    if(!quiet)card.style.animationDelay=(k*0.12)+'s';else card.style.animation='none';
+    card.innerHTML=`<b>${a[1]}</b>${a[2]}`;
+    phoneEl.appendChild(card);
+    const dot=document.createElement('div');
+    dot.className='hitdot';dot.style.left=dx+'px';dot.style.top=dy+'px';if(quiet)dot.style.animation='none';
+    phoneEl.appendChild(dot);
+    const line=document.createElementNS(svgNS,'line');
+    line.setAttribute('x1',right?426:-12);line.setAttribute('y1',top+16);
+    line.setAttribute('x2',dx);line.setAttribute('y2',dy);
+    svg.appendChild(line);
+  });
+  phoneEl.appendChild(svg);
+  return miss;
+}
+
+/* ===== 文稿与成册 ===== */
+const AV='银发回忆录_双端协同App/assets/';
+const MERGE_TXT='小忆合成 · 待确认项不进正文';
+const PAPERS={
+ wait:`<div class="phead"><span class="cnt">素材汇入中</span><h4>第二章 · 第一个出口订单</h4><div class="meta">等待两端素材 · 小忆监听中</div></div><div class="skeleton">照片、原声、边注正从两端汇入这一章……<br><b>素材齐全后，这里将生成文稿</b></div>`,
+ waitPhoto:`<div class="phead"><span class="cnt">素材汇入中</span><h4>第二章 · 第一个出口订单</h4><div class="meta">影像素材已抵达 · 等待原声确认</div></div><img class="pphoto" src="${AV}expo.png"><div class="pcap">2001 年 · 广交会合影 · 协助端上传（先入边注层）</div><div class="skeleton" style="padding-top:8px">照片已归入本章「影像」类<br><b>待本人原声确认后进入正文</b></div>`,
+ microFather:`<div class="phead"><span class="cnt">① 原声转写</span><h4>一句话怎样汇入章节</h4><div class="meta">先保留讲述端原话，等待本人回听确认</div></div><div class="source-legend"><span><i style="background:#a75d36"></i>父亲 · 原话</span><span><i style="background:#6e9baa"></i>女儿 · 补充</span></div><div class="micro-card"><small>陈建华 · 讲述端原声</small><p><span class="source-father">那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。</span></p></div><div class="micro-card waiting">小忆先把这一句放进待整理稿；未确认前不写入正式章节。</div>`,
+ microPrompt:`<div class="phead"><span class="cnt">② 请求补充</span><h4>一句话怎样汇入章节</h4><div class="meta">原话锁定 · 小忆只邀请女儿补可核对的场景</div></div><div class="source-legend"><span><i style="background:#a75d36"></i>父亲 · 原话</span><span><i style="background:#6e9baa"></i>女儿 · 补充</span></div><div class="micro-card"><small>陈建华 · 原话保持不变</small><p><span class="source-father">那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。</span></p></div><div class="micro-card waiting">等待女儿补充：照片里看到了什么？哪些细节确实听父亲说过？</div>`,
+ microHelper:`<div class="phead"><span class="cnt">③ 两端汇入</span><h4>一句话怎样汇入章节</h4><div class="meta">不同颜色显示素材来源 · 此时仍是待确认稿</div></div><div class="source-legend"><span><i style="background:#a75d36"></i>父亲 · 原话</span><span><i style="background:#6e9baa"></i>女儿 · 补充</span></div><div class="micro-card"><small>陈建华 · 原声转写</small><p><span class="source-father">那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。</span></p></div><div class="micro-card"><small>陈思颖 · 照片与女儿视角</small><p><span class="source-helper">小时候我常听爸爸提起这笔订单。翻出展会合影后，我才看见他当年站在角落里的小展位前。</span></p></div>`,
+ microMerged:`<div class="phead"><span class="cnt">④ 待本人确认</span><h4>第二章 · 第一个出口订单</h4><div class="meta">小忆合成示例 · 出处可见 · 原话未改</div></div><div class="source-legend"><span><i style="background:#a75d36"></i>父亲原话</span><span><i style="background:#6e9baa"></i>女儿视角</span></div><div class="micro-card"><small>合成段落 · 待陈建华确认</small><p><span class="source-father">“那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。”</span><span class="source-helper">多年后，女儿思颖翻出那张广交会合影，才第一次看见父亲说的小展位就在展馆角落。她记得，父亲从她小时候起就常提起这笔订单。</span></p></div><div class="foot">小忆只把女儿的第一人称补充转为有署名的第三人称场景；父亲那一句保持原字原意。章节落笔前仍需父亲确认。</div>`,
+ draft:`<div class="phead"><span class="cnt" style="color:#8d3f22;background:#fbe9e2">整理稿 · 待本人确认</span><h4>第二章 · 第一个出口订单</h4><div class="meta">小忆整理 · 未经确认不写入书里</div></div>
+ <img class="pphoto" src="${AV}expo.png"><div class="pcap">本章配图 · 2001 年广交会合影</div>
+ <p>这张照片是<span class="todo">零一年</span>的广交会，我们第一次去参加。展位是最小的那种，三米乘三米，在角落里。我带了两个样品箱，是自己扛进去的。</p>
+ <p>那天来了一位马来西亚的客户，华裔，姓黄。他问了几个技术参数，留了一张名片。我当时英文不行，拿个计算器跟他比划价格。后来黄先生给了我们第一张出口订单——<span class="mark">三万美金</span>。我高兴得一晚上没睡。</p>
+ <p>合同签完我没敢告诉国平，怕他以为我在吹牛。等货装上了船，我才跟他说。他愣了一下，然后笑了，说：「行啊，老陈。」</p>
+ <div class="foot">小忆判断：去掉 3 个无信息的“嗯”；“三万美金”说两次属强调，保留；<b>「零一年」与协助端边注「2001 春交会」颗粒度不同 → 标为待确认，暂不改写</b>。</div>`,
+ final:`<div class="phead"><span class="cnt">正文 553 字 · 已确认</span><h4>第二章 · 第一个出口订单</h4><div class="meta">口述：陈建华 ｜ 整理：小忆（经本人确认）</div></div>
+ <img class="pphoto" src="${AV}expo.png"><div class="pcap">2001 年 · 广交会 · 本章配图已入册</div>
+ <p>这张照片是二〇〇一年的广交会，我们第一次去参加。展位是最小的那种，三米乘三米，在角落里。我带了两个样品箱，是自己扛进去的。</p>
+ <p>那天来了一位马来西亚的客户，华裔，姓黄。他看了看我们的产品，问了几个技术参数，留了一张名片。我当时英文不行，就拿个计算器跟他比划价格。后来，这位黄先生给了我们第一张出口订单——三万美金。我高兴得一晚上没睡着。三万美金，在那时候对我是一笔很大的钱。</p>
+ <p>合同签完，我没敢告诉国平，怕他以为我在吹牛。等货真的装上了船，我才跟他说。他愣了一下，然后笑了，说：「行啊，老陈。」</p>
+ <p>交货那天我自己去的码头，就站在那里，看着集装箱一个一个装上去，心里说不出是什么感觉。后来想想，大概就是从那一天起，我觉得我们厂的东西，是真的可以卖到很远的地方去的。</p>
+ <p>回来的火车上，我把那份合同叠成四折，放在贴身的口袋里，一路摸出来看了三次，纸边都让我捏软了。车到杭州站时天刚亮，我在站台上站了一会儿，觉得这座城市好像跟昨天出门时不太一样了。</p>
+ <p>黄先生后来跟了我们十几年。每年他来中国，我都请他吃饭。他不会用筷子，每次都让我教，但每次都学不会。这件事我们笑了很多年。如今厂子早就不在了，可那张照片还在——展位小，人站得直。那是我这一辈子，第一次把生意做到了门外去。</p>
+ <div class="foot">「零一年」依本人原话写作「二〇〇一年」；正文每一个字都经本人回听确认。</div>`,
+ book:`<div class="bookwrap">
+  <div class="book3d" id="book3d">
+   <div class="book-leaf"><div class="bpage bleft"><h5>第二章 · 第一个出口订单</h5><img src="${AV}expo.png"><div class="cap">2001 年 · 广交会</div><p>这张照片是二〇〇一年的广交会，我们第一次去参加。展位是最小的那种，三米乘三米，在角落里。我带了两个样品箱，是自己扛进去的。</p><p>那天来了一位马来西亚的客户，华裔，姓黄。他看了看我们的产品，问了几个技术参数，留了一张名片。我当时英文不行，就拿个计算器跟他比划价格。后来，这位黄先生给了我们第一张出口订单——三万美金。我高兴得一晚上没睡着。三万美金，在那时候对我是一笔很大的钱。</p></div>
+   <div class="bcover"><span class="seal">忆</span><h3>工作回忆</h3><small>陈建华 · 口述</small></div></div>
+   <div class="bpage bright"><p style="margin-top:0">合同签完，我没敢告诉国平，怕他以为我在吹牛。等货真的装上了船，我才跟他说。他愣了一下，然后笑了，说：「行啊，老陈。」</p><p>交货那天我自己去的码头，就站在那里，看着集装箱一个一个装上去，心里说不出是什么感觉。后来想想，大概就是从那一天起，我觉得我们厂的东西，是真的可以卖到很远的地方去的。</p><p>回来的火车上，我把那份合同叠成四折，放在贴身的口袋里，一路摸出来看了三次，纸边都让我捏软了。车到杭州站时天刚亮，我在站台上站了一会儿，觉得这座城市好像跟昨天出门时不太一样了。</p><p>黄先生后来跟了我们十几年。每年他来中国，我都请他吃饭。他不会用筷子，每次都让我教，但每次都学不会。这件事我们笑了很多年。如今厂子早就不在了，可那张照片还在——展位小，人站得直。那是我这一辈子，第一次把生意做到了门外去。</p><div class="foot2">口述：陈建华 ｜ 整理：小忆（经本人确认）</div></div>
+  </div>
+ </div>`};
+
+/* 成册动画：合成提示语粒子消散（含装饰线一起消失）→ 立体书升起 → 封面缓缓打开成左右两页，之后保持不动 */
+let bookOpened=false,bookShown=false;
+function playBookAnim(){
+  const m=document.getElementById('mergeTxt');
+  m.innerHTML=MERGE_TXT.split('').map((c,i)=>`<span style="--dl:${(i*0.03).toFixed(2)}s;--tx:${(Math.random()*180-90).toFixed(0)}px;--ty:${(-30-Math.random()*90).toFixed(0)}px;--rt:${(Math.random()*160-80).toFixed(0)}deg">${c===' '?'&nbsp;':c}</span>`).join('');
+  m.classList.add('dissolve');
+  setTimeout(()=>{m.classList.add('gone');},1250);
+  setTimeout(()=>{const b=document.getElementById('book3d');if(b)b.classList.add('open');},650);
+}
+function resetMerge(){
+  const m=document.getElementById('mergeTxt');
+  m.classList.remove('dissolve','gone');m.textContent=MERGE_TXT;
+}
+function hideMerge(){const m=document.getElementById('mergeTxt');m.classList.add('gone');}
+
+/* ===== 节点 × 步骤（focus：L=只切讲述端 R=只切协助端 both=两端同切；浮窗文案描述产品核心功能与 AI 判断设计） ===== */
+function onboardingDemoStep(name,side,action,activeText,agent,selector){
+  const father=side==='L',wait=father?'女儿仍可看到「我来协助」入口':'父亲已完成自己的选择';
+  const active={n:activeText,ag:agent},idle={n:wait,ag:'各自选择与确认身份'};
+  const activeXY={c:activeText,f:'入驻流程逐步显示当前选择',ag:agent};
+  const idleXY={c:'等待另一端',f:'保留已有选择',ag:'不代替对方作答'};
+  return {name,focus:side,[side]:action,
+    ...(selector?{[father?'annosL':'annosR']:[[selector,name,agent]]}:{}),
+    ioL:father?active:idle,ioR:father?idle:active,
+    xyL:father?activeXY:idleXY,xyR:father?idleXY:activeXY,
+    agent:'小忆判断：'+agent,
+    jtbdL:father?activeText:'陈建华保留讲述者身份，等待女儿完成自己的入驻。',
+    jtbdR:father?'陈思颖稍后以协助者身份加入。':activeText};
+}
+const NODES=[
+ {id:'0',name:'选身份',paper:'wait',steps:[
+  {name:'两端看到身份入口：讲述与协助',focus:'both',srcL:'fresh=1',srcR:'fresh=1',L:`state.route='home';render()`,R:`state.route='home';render()`,
+   annosL:[['[data-val="narrator"]','双身份入口','同一回忆空间，身份决定界面与权限']],
+   annosR:[['[data-val="helper"]','协助者视图','上传线索与排版，无正文确认权']],
+   ioL:{n:'看到「我来讲述」入口',ag:'身份决定界面形态与默认字号'},
+   ioR:{n:'看到「我来协助」入口',ag:'同一空间，两种视图与权限'},
+   xyL:{c:'初始化讲述端',f:'大字号 + 语音优先的首页',ag:'年长者 → 默认大字号'},
+   xyR:{c:'初始化协助端',f:'清单与画布视图',ag:'协助者不接触确认权'},
+   agent:'小忆判断：身份决定看到什么，确认权始终在讲述者',
+   jtbdL:'陈建华，72 岁，退休前经营一家五金厂。午后他独自在家，第一次打开子女装好的 App——当他不确定这个应用是不是「给自己用的」时，他需要一眼看懂「我是故事的主人」，知道这里是用自己的话讲自己故事的地方，不需要学任何新东西。',
+   jtbdR:'陈思颖，30 岁，陈建华的女儿，在城里工作。通勤路上她第一次打开 App——当她想帮父亲记录又怕「替他做主」时，她需要明确看到「我帮家人记录整理」，知道自己的位置是协助而不是代替。'},
+  onboardingDemoStep('父亲选择「我来讲述」','L',`memoDemo.selectRole('narrator')`,'陈建华选择讲述者，进入姓名填写','原声与正文确认权归父亲','.ob-card'),
+  onboardingDemoStep('父亲确认姓名：陈建华，年龄：72 岁','L',`memoDemo.step('ob-to-age')`,'姓名写入扉页，年龄页直接显示 72 岁','入驻资料由本人确认','.ob-age'),
+  onboardingDemoStep('父亲确认 72 岁，选择故事主人','L',`memoDemo.step('ob-next')`,'确认年龄后，进入「写谁的故事」','故事归属由讲述者决定','.ob-opts'),
+  onboardingDemoStep('父亲选择「写我自己」','L',`memoDemo.step('ob-self')`,'选择写自己的故事','本人是故事主人，拥有确认权','.ob-opts'),
+  onboardingDemoStep('父亲选择家人协助','L',`memoDemo.step('ob-join-yes')`,'允许女儿一起补充照片和线索','协助不会改变父亲的原话','.ob-opts'),
+  onboardingDemoStep('父亲先邀请女儿加入','L',`memoDemo.step('ob-join-no')`,'女儿还没有忆页账号，先展示邀请卡','账号可稍后通过忆页 ID 绑定','.invite-card'),
+  onboardingDemoStep('父亲进入讲述端首页','L',`memoDemo.step('ob-invite-skip')`,'邀请可稍后发送，父亲先进入首页','父亲可独立开始讲述','.direct-record'),
+  onboardingDemoStep('女儿选择「我来协助」','R',`memoDemo.selectRole('helper')`,'陈思颖选择协助者，进入姓名填写','照片与线索由女儿补充','.ob-card'),
+  onboardingDemoStep('女儿确认姓名：陈思颖','R',`memoDemo.step('ob-to-age')`,'姓名进入协作记录，接着选择年龄','协助者以自己的身份出现','.ob-age'),
+  onboardingDemoStep('女儿选择年龄：30 岁','R',`memoDemo.step('ob-age-up')`,'点击加号，将年龄从 29 调到 30 岁','年龄用于调整协助端提示','.ob-age'),
+  onboardingDemoStep('女儿确认年龄，填写父亲姓名','R',`memoDemo.step('ob-next')`,'确认 30 岁，填写要帮助的陈建华','明确协助对象','.ob-card'),
+  onboardingDemoStep('女儿确认协助对象：陈建华','R',`memoDemo.step('ob-next')`,'确认父亲姓名，进入人物关系选择','协作关系会显示在记录里','.ob-opts'),
+  onboardingDemoStep('女儿选择关系：父亲','R',`memoDemo.step('ob-relative-father')`,'选择「父亲」，说明两人的关系','关系用于组织协作线索','.ob-opts'),
+  onboardingDemoStep('女儿选择双方一起记录','R',`memoDemo.step('ob-join-yes')`,'父亲也会用 App，双方共同记录','正式文稿仍由父亲确认','.ob-opts'),
+  onboardingDemoStep('女儿选择「对方已有账号」','R',`memoDemo.step('ob-has-account')`,'父亲已有账号，进入绑定方式选择','使用忆页 ID 连接同一回忆空间','.bind-id-row'),
+  onboardingDemoStep('输入忆页 ID，绑定父亲账号','R',`memoDemo.step('ob-bind-submit')`,'确认示例 ID YY-7268-JH，看到绑定成功','双方素材互通，操作权限仍按身份区分','.bind-ok'),
+  {name:'绑定成功：两端进入同一回忆空间',focus:'both',R:`memoDemo.step('ob-bind-enter')`,
+   ioL:{n:'进入讲述端首页',ag:'语音优先，原话由本人确认'},
+   ioR:{n:'绑定成功，进入协助端进度页',ag:'可上传照片、补线索和排版'},
+   xyL:{c:'准备听父亲讲述',f:'显示大字号与开讲入口',ag:'保持讲述者主导'},
+   xyR:{c:'账号绑定完成',f:'显示进度和素材入口',ag:'两端协作，同步成章'},
+   agent:'身份与绑定完成：同一回忆空间，两端各有明确的操作边界',
+   jtbdL:'陈建华进入讲述端，能从熟悉的人和话题开始讲。',jtbdR:'陈思颖进入协助端，可以上传自己拍的照片并补充线索。'}]},
+ {id:'1',name:'双线录入',paper:'wait',steps:[
+  {name:'首页：从想听的人找到故事',focus:'L',srcL:'role=narrator',L:`state.route='home';render()`,
+   annosL:[['.direct-record','零学习成本入口','核心动作置顶，一键直达录音'],['.guide-card .guide-photo','引导式访谈','一轮只问一个具体问题，降低开口门槛'],['.people-strip .person-card','关系驱动选题','按「谁想听」组织提问线索']],
+   ioL:{q:'“这张照片啊，是零一年广交会……”',n:'语音 02\'41" · 采集中',ag:'按已有线索选第一问，一轮只问一个'},
+   ioR:{n:'展会合影已就绪 · 等待发出',ag:'线索未经本人确认前，只作提问依据'},
+   xyL:{c:'以已有线索发起第一问',f:'首页小忆气泡，一个问题 + 可语音回答',ag:'从「他们想听的故事」里选最相关的人'},
+   xyR:{c:'同步本章素材缺口',f:'进度清单「口述」亮起待办',ag:'七类素材缺 5 类，按优先级排序'},
+   agent:'小忆判断：一次只问一个，问题来自已有线索',
+   jtbdL:'陈建华午后坐在客厅，想记录「第一个出口订单」这段经历。当他面对空白不知道从何说起时，他跟着小忆提出的一个具体问题开口讲——不需要组织语言、不需要打字，让原话不打折扣地被记下来。',
+   jtbdR:'陈思颖在通勤地铁上打开进度页。当她想知道这一章还差什么时，她看一张会自己打勾的七类素材清单，就知道下一步该补什么，而不是打电话去问父亲。'},
+  {name:'人物关系：找到合伙人赵国平',focus:'L',L:`memoDemo.step('people')`,
+   annosL:[['.relation-map','人物关系图','从关系进入具体人物，沿人寻找故事'],['[data-person="partner"]','赵国平 · 合伙人','一起创业的人是这章的起话头']],
+   ioL:{n:'查看人物关系 · 选赵国平',ag:'按人与关系组织话题'},ioR:{n:'女儿暂未操作',ag:'讲述端自己选择从谁说起'},
+   xyL:{c:'连接人物与经历',f:'关系图显示合伙人赵国平',ag:'只给线索，不替本人决定故事'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：具体的人比空白输入更容易唤起回忆',
+   jtbdL:'陈建华点进人物关系，在熟悉的人里看到老搭档赵国平，决定从一起创业那几年说起。',jtbdR:'陈思颖不需要替父亲挑话题。'},
+  {name:'点开赵国平：看看他想听什么',focus:'L',L:`memoDemo.step('partner-questions')`,
+   annosL:[['.profile-hero','具体人物','人物页把关系、提问和原声放在一起'],['.note-card','来自合伙人的提问','先看到对方想听的故事']],
+   ioL:{n:'赵国平 · 合伙人提问',ag:'人物提问仅作引导'},ioR:{n:'（同步人物线索）',ag:'不代替讲述'},
+   xyL:{c:'展示人物提问',f:'「当年一起创业，你最先想起什么？」',ag:'提问不作为事实写入正文'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：把人和故事线索放到同一处',
+   jtbdL:'陈建华点开赵国平，看见老伙伴留下的问题。他想起第一次拿到出口订单时，两人说过的话。',jtbdR:'陈思颖能看到父亲从哪位人物开始，但不替他回答。'},
+  {name:'故事线索：选第一个出口订单',focus:'L',L:`memoDemo.step('partner-topics')`,
+   annosL:[['[data-detail="topics"]','人物下的具体话题','切到故事线索，看到「第一个出口订单」'],['[data-topic="第一个出口订单"]','选择这件事','用一个具体事件开启讲述']],
+   ioL:{n:'赵国平 → 第一个出口订单',ag:'话题为起点，仍以原声为准'},ioR:{n:'（等待本人讲述）',ag:'线索不写入正文'},
+   xyL:{c:'把人物线索变成起话头',f:'故事线索页显示具体事件',ag:'不会把话题标题当事实'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：从熟人和具体事件切入，一次只问一件事',
+   jtbdL:'陈建华切到「故事线索」，选择「第一个出口订单」。接下来他只要说自己记得的经过。',jtbdR:'陈思颖看到父亲选择了这件事，知道可以去找相关照片。'},
+  {name:'从人物话题开讲：原声优先',focus:'L',L:`memoDemo.step('partner-record')`,
+   annosL:[['.record-question','话题进入录音页','「第一个出口订单」成为小忆的起话头'],['.record-orb','原声输入','由本人开口讲，文字随后整理']],
+   ioL:{n:'从赵国平的话题开始口述',ag:'原声保留，问题只引导'},ioR:{n:'准备寻找相关老照片',ag:'素材可异步补充'},
+   xyL:{c:'承接人物话题',f:'录音页显示具体提问',ag:'不替他说结论'},xyR:{c:'提示影像素材缺口',f:'进度页照片待补',ag:'协助者可补素材'},
+   agent:'小忆判断：话题进入录音，真正的经过仍由本人讲',
+   jtbdL:'陈建华从「第一个出口订单」开口讲，录音页接住这个话题，接下来由他说出细节。',jtbdR:'陈思颖知道这一章要讲什么，开始翻旧相册找照片。'},
+  {name:'女儿翻拍旧全家福：选择 AI 复原',focus:'R',srcR:'role=helper',R:`state.uploadSheet=true;render()`,
+   annosR:[['.upload-options','女儿拍照上传','旧相册里的照片由协助端拍下'],['.upload-options button','进入老照片复原','从上传入口进入修复流程']],
+   ioL:{n:'父亲继续讲述，不受打扰',ag:'照片只是异步素材'},ioR:{n:'约 1978 年的全家福 · 女儿翻拍',ag:'先存原片，后做复原'},
+   xyL:{c:'保持讲述节奏',f:'讲述端不弹出修复任务',ag:'协助工作不打断原声'},xyR:{c:'选择老照片复原',f:'上传浮层 → 受损原片',ag:'修复操作由照片上传者完成'},
+   agent:'小忆判断：谁拍照上传，谁在协助端完成复原',
+   jtbdL:'陈建华继续讲自己的故事，不用在录音中切去修照片。',jtbdR:'陈思颖在旧相册里翻拍一张缺角全家福，准备在自己的手机上修复，再交给父亲查看。'},
+  {name:'选择老照片复原：保留受损原片',focus:'R',R:`memoDemo.repair(0)`,
+   annosR:[['.repair-photo','原片留档','先看到女儿翻拍的受损原片'],['[data-dual="repair-upload"]','上传老照片','交给小忆检测破损']],
+   ioL:{n:'父亲继续讲述',ag:'修复不会打断录音'},
+   ioR:{n:'约 1978 年的全家福 · 待上传',ag:'保留原片，复原结果另存'},
+   xyL:{c:'（待命）',f:'—',ag:'无新指令'},
+   xyR:{c:'引导选择旧照片',f:'显示原片与「上传这张老照片」',ag:'原片始终保留'},
+   agent:'小忆判断：先保留原片，再检测照片破损',
+   jtbdL:'陈建华继续讲自己的经历，不需要操作修复工具。',
+   jtbdR:'陈思颖看到翻拍的缺角全家福，确认原片保留后，交给小忆检测。'},
+  {name:'上传老照片：检测破损并给出方案',focus:'R',R:`memoDemo.repair(1)`,
+   annosR:[['.repair-tags','多模态识别','AI 检测破损类型并逐项标注'],['.agent-decisions','修复方案可见','逐项说明要修什么'],['[data-dual="repair-start"]','一键开始复原','女儿确认方案后启动']],
+   ioL:{n:'父亲继续讲述',ag:'复原照未确认前只作素材'},
+   ioR:{n:'缺角全家福 ×1 · 已上传待修复',ag:'检测破损后自动生成方案'},
+   xyL:{c:'（待命）',f:'—',ag:'无新指令'},
+   xyR:{c:'检测破损并生成方案',f:'破损标签 + 修复方案卡',ag:'先公开方案，再开始修复'},
+   agent:'小忆判断：破损逐项检测，修复方案先公开再动手',
+   jtbdL:'陈建华不被照片处理打断，原片也没有被直接写进正文。',
+   jtbdR:'陈思颖看到缺角、折痕和霉斑的检测结果，点「开始 AI 复原」。'},
+  {name:'AI 复原中：四步逐项修复',focus:'R',R:`memoDemo.repair(2)`,
+   annosR:[['.repair-photo','修复过程可见','扫描线扫过照片，逐项修复'],['.repair-steps','步骤逐项点亮','补缺角 → 去折痕 → 清霉斑 → 还原色彩']],
+   ioL:{n:'父亲继续口述',ag:'协助端修复过程安静进行'},
+   ioR:{n:'修复中 · 四步逐项进行',ag:'原片留档可回退'},
+   xyL:{c:'（待命）',f:'—',ag:'无新指令'},
+   xyR:{c:'执行四步修复',f:'扫描动效 + 步骤逐项点亮',ag:'按方案顺序修复，过程全程可见'},
+   agent:'小忆判断：修复过程透明，每一步都看得见',
+   jtbdL:'陈建华不必处理照片；稍后可以在自己的经历时间轴里查看。',
+   jtbdR:'陈思颖看到扫描线扫过原片，四个修复步骤逐项亮起，过程清楚可见。'},
+  {name:'修复完成：女儿拖动对比原片',focus:'R',R:`memoDemo.repair(3)`,
+   annosR:[['.cmp-handle','前后对比','拖动手柄检查修复效果'],['[data-dual="repair-save"]','存入素材','复原照先进入影像素材']],
+   ioL:{n:'复原照等待查看',ag:'女儿不能代父亲确认正文'},
+   ioR:{n:'修复完成 · 前后对比',ag:'先检查效果，再保存素材'},
+   xyL:{c:'预备同步影像',f:'经历时间轴稍后出现复原照',ag:'只同步素材，不自动入正文'},
+   xyR:{c:'提供前后对比与存档',f:'对比滑杆 +「存入素材」',ag:'修复结果可回看原片'},
+   agent:'小忆判断：修复照由上传者检查，正文仍由讲述者确认',
+   jtbdL:'陈建华以后在经历时间轴能看到这张照片，但正文是否采用仍由他决定。',
+   jtbdR:'陈思颖拖动对比手柄，确认缺角和折痕修好了，再决定保存。'},
+  {name:'女儿保存复原照：同步到经历时间轴',focus:'R',R:`memoDemo.saveRepair()`,alsoL:`memoDemo.syncRepair()`,
+   annosR:[['.mphoto.fixed','复原照已保存','影像列表显示已复原的照片']],
+   ioL:{n:'经历时间轴收到复原照',ag:'照片与原话分层保存'},
+   ioR:{n:'复原照已存入素材',ag:'原片保留，可回看'},
+   xyL:{c:'同步复原影像',f:'经历时间轴出现旧全家福',ag:'待本人决定是否入正文'},
+   xyR:{c:'保存复原照并归类',f:'影像列表显示「已复原」',ag:'原片仍留档'},
+   agent:'小忆判断：协助端修复与保存，讲述端随后查看确认',
+   jtbdL:'陈建华的经历时间轴收到这张复原照，可以结合自己的回忆查看。',
+   jtbdR:'陈思颖点「存入素材」，复原照进影像列表，并同步到父亲的照片时间轴。'},
+  {name:'女儿拍照上传：三类线索一个入口',focus:'R',srcR:'role=helper',paper:'waitPhoto',R:`state.route='home';state.uploadSheet=true;render()`,
+   annosR:[['.upload-options button','多源线索入口','拍照 / 相册 / 老照片统一进素材层'],['.upload-options button:nth-child(2)','边注层设计','协助者素材先入边注，不直接进正文']],
+   ioR:{n:'拍下展会合影 ×1 · 即拍即传',ag:'识别为 2001 广交会场景，挂入本章时间线'},
+   ioL:{n:'老人暂未操作',ag:'刚讲完一段，间隔一段时间再问'},
+   xyR:{c:'把照片归入本章「影像」类',f:'上传浮层收起，清单「照片」打勾',ag:'照片需本人确认才进正文'},
+   xyL:{c:'暂不问，攒到下一个提问时机',f:'首页无打扰',ag:'提问时机按老人作息安排'},
+   agent:'小忆判断：上传即归类，线索先入边注层',
+   jtbdR:'陈思颖周末回家，在旧相册里看到父亲当年在展会的合影。当她发现这张照片正好补上章节的「影像」缺口时，她拍下来传进去——照片先进入边注层，等父亲亲口确认后才进入正文。',
+   jtbdL:'陈建华这边没有被打扰。当他下午精神好时，小忆才会拿着这张照片来问他——上传素材不会变成突如其来的打扰。'},
+  {name:'女儿写边注：话随照片抵达',focus:'R',paper:'waitPhoto',R:`state.memoMicro=null;state.uploadSheet=false;route('sendclue')`,
+   annosR:[['#clue-form','边注 = 提问线索','协助者补充的事实只作为提问依据'],['.agent-decisions','提问策略可见','agent 公开「将怎样问」，事实待本人确认'],['[data-dual="sendclue-submit"]','异步协同','不打扰讲述者，进入下次提问队列']],
+   ioR:{n:'边注 · 已送达 · 待原声确认',ag:'边注挂到本章时间线对应年份'},
+   ioL:{n:'老人暂未操作',ag:'无打扰，等提问时机'},
+   xyR:{c:'把边注改写成口语问题',f:'边注卡显示「已送达 · 待原声确认」',ag:'事实类信息不直接写进问题'},
+   xyL:{c:'接收线索，准备代问',f:'（下一步在录制页体现）',ag:'与已有口述比对，冲突项标待确认'},
+   agent:'小忆判断：边注只作提问依据，未经原声确认不进正文',
+   jtbdR:'陈思颖在照片下补了一段边注。当她怕打电话打断父亲午睡时，她让话跟着照片到——小忆会挑合适的时机，把边注变成一个口语化的问题替她去问。',
+   jtbdL:'陈建华还不知道照片到了。当他下次打开 App 时，小忆会自然地提起这张照片——新线索以提问的方式出现，而不是以通知的方式轰炸。'},
+  {name:'老人回答：小忆替女儿问',focus:'L',paper:'waitPhoto',L:`state.memoMicro=null;route('agent-demo-record')`,
+   annosL:[['.record-question','agent 代问','协助者线索被改写为开放问题'],['.agent-why','决策可解释','提问依据对讲述者透明可查'],['[data-final="demo-start"]','语音优先输入','原声与转写双轨保存']],
+   ioL:{q:'“看着这张合影……那天来了一位马来西亚的客户，华裔，姓黄。”',n:'语音采集中 · 实时转写',ag:'转写与原声双轨保存'},
+   ioR:{n:'女儿看到「讲述中」',ag:'讲述期间暂停推送新线索'},
+   xyL:{c:'持照片提问，安静聆听',f:'录制页小忆问句 + 录音球',ag:'只问开放问题，不诱导答案'},
+   xyR:{c:'显示「讲述中」状态',f:'进度页线程亮起',ag:'讲述中不打扰任何一端'},
+   agent:'小忆判断：线索变成开放问题，答案必须是本人原声',
+   jtbdL:'陈建华看到小忆拿着女儿传来的照片问他。当他看到具体的照片时，那天的情形自己就想起来了——他只需要按住说话，文字由小忆实时形成，原声也一并保存。',
+   jtbdR:'陈思颖看到进度页亮起「讲述中」。当她什么都没做时，也知道父亲正在回答她的线索——协同不需要互相打电话确认。'},
+  {name:'一句原话：父亲说出展位那天',focus:'L',paper:'microFather',L:`memoDemo.step('micro-father')`,
+   annosL:[['#live-transcript-lines','实时转写','讲述端显示刚说出的完整一句'],['.record-orb','原声仍在','原声与转写一起保存']],
+   ioL:{q:'“那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。”',n:'原声 00:12 · 一句话已转写',ag:'先原样收录，待本人回听'},
+   ioR:{n:'（等待协助补充）',ag:'不能改动父亲原话'},
+   xyL:{c:'逐字转写这句口述',f:'录音页出现完整句子',ag:'语气词以外不替换内容'},
+   xyR:{c:'准备询问照片场景',f:'稍后出现协助提示',ag:'只补看见或确实听过的细节'},
+   agent:'小忆录入待整理句：那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。',
+   jtbdL:'陈建华说出一句具体的话，讲述端马上显示转写；中间先只放这句原话。',jtbdR:'陈思颖还没有补写，父亲的句子保持原样。'},
+  {name:'小忆提示女儿：补照片看见的场景',focus:'R',paper:'microPrompt',R:`memoDemo.step('micro-helper-prompt')`,
+   annosR:[['.agent-decisions','小忆补充指令','只请女儿补照片细节与她亲历的记忆'],['#clue-form','女儿视角输入','父亲原话被锁定，不可在此改字']],
+   ioL:{q:'“那天展位小得很……”',n:'原话已锁定，等待确认',ag:'讲述端句子不变'},
+   ioR:{n:'收到小忆提示：照片里看到了什么？',ag:'女儿只补自己知道的事'},
+   xyL:{c:'保留父亲原话',f:'待整理句继续显示',ag:'讲述权属于本人'},
+   xyR:{c:'请补充照片与女儿视角',f:'协助端出现具体提示和空白输入框',ag:'来源与说话人必须标明'},
+   agent:'小忆指令协助端：补充你在照片里看到的细节，以及确实听父亲提起过的记忆；不要改他的原话。',
+   jtbdL:'陈建华的那句话一直留在左侧，不因女儿补充而变化。',jtbdR:'陈思颖收到具体问题，知道可以补展位照片和自己的记忆，而不是代父亲改写。'},
+  {name:'女儿输入：照片细节和自己的记忆',focus:'R',paper:'microHelper',R:`memoDemo.step('micro-helper-input')`,
+   annosR:[['#clue-form textarea','女儿补充','输入她听过的订单故事和照片里的小展位'],['.agent-decisions','来源有标记','这段是女儿视角，不冒充父亲原声']],
+   ioL:{q:'“那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。”',n:'父亲原话 · 保持不变',ag:'未被协助端覆盖'},
+   ioR:{q:'“小时候我常听爸爸提起这笔订单。翻出展会合影后，我才看见他当年站在角落里的小展位前。”',n:'女儿视角 · 已补充',ag:'只补场景与个人记忆'},
+   xyL:{c:'保留原话',f:'原声和转写仍在',ag:'不让协助端改父亲句子'},
+   xyR:{c:'接收有署名的补充',f:'女儿输入内容进入边注层',ag:'不把女儿见闻说成父亲经历'},
+   agent:'小忆并列两端输入：父亲讲价格与心情；女儿补照片细节和她听过的回忆，暂不改写原话。',
+   jtbdL:'陈建华的句子仍然一字不变。',jtbdR:'陈思颖写下自己小时候听父亲提起订单、如今在合影里看到小展位的感受。'},
+  {name:'小忆合成：两种颜色标明来源',focus:'both',paper:'microMerged',
+   annosL:[['#live-transcript-lines','父亲原话未改','合成段落完整保留这句口述']],
+   annosR:[['#clue-form textarea','女儿视角有署名','补充内容转成自然叙述并标明来源']],
+   ioL:{q:'“那天展位小得很，我跟黄先生比划着算价格，晚上高兴得睡不着。”',n:'橘色 · 父亲原话',ag:'句子原样保留'},
+   ioR:{q:'“小时候我常听爸爸提起这笔订单……”',n:'蓝色 · 女儿补充',ag:'以「女儿思颖」署名进入场景'},
+   xyL:{c:'请父亲核对合成段落',f:'中间正文先标为待确认',ag:'最终落笔仍需父亲点头'},
+   xyR:{c:'保留补充来源',f:'女儿视角以蓝色标出',ag:'不混淆两端叙述者'},
+   agent:'小忆合成：父亲原句不变；女儿第一人称补充改为有署名的场景说明，待父亲确认。',
+   jtbdL:'陈建华看到合成后的段落，橘色仍是自己说出的完整一句，可以核对有没有被改。',jtbdR:'陈思颖看到蓝色句子带着自己的视角自然接在后面，没有被冒充为父亲原话。'}]},
+ {id:'2',name:'Agent 处理',paper:'draft',steps:[
+  {name:'回听确认：这段话是我的',focus:'L',L:`openRecord(null,'第一个出口订单');state.recordSeconds=161;route('preview')`,alsoR:`state.uploadSheet=false;state.route='home';render()`,
+   annosL:[['[data-action="play-preview"]','回听确认制','任何整理都以本人听过并同意为前提'],['.xy-chat','最小补白追问','只在关键信息缺失时追问，一轮一个']],
+   ioL:{q:'“……合同签完我没敢告诉国平，怕他以为我在吹牛。”',n:'回听确认中',ag:'追问只补缺口（年份），不问已确认的事实'},
+   ioR:{n:'清单「口述」闪烁待办',ag:'同步进度，女儿不能代答'},
+   xyL:{c:'发起唯一追问：缺哪一项补哪一项',f:'回听页小忆气泡 +「跳过」',ag:'年份缺失且影响章节排序，才追问'},
+   xyR:{c:'标记口述已录入',f:'清单「口述」打勾 · 5/7',ag:'确认权在本人，协助端只读'},
+   agent:'小忆判断：先听后定，留不留由父亲决定',
+   jtbdL:'陈建华讲完一段，戴上老花镜听回放。当机器帮他整理文字时，他要能听懂改了什么、并保留「不像我说的就重录」的权利——每一段话保存前，都先经过他自己的耳朵。',
+   jtbdR:'陈思颖看到清单上的「口述」打了勾。当她什么都没做时，也知道父亲那边进行到了哪一步——进度是自动同步的。'},
+  {name:'整理核查：改了什么都写明',focus:'L',L:`route('agent-review')`,
+   annosL:[['.agent-decisions','整理判断公开','每处修改附依据：口头禅删减、强调保留'],['.uncertain-note','冲突挂起机制','两端事实不一致时进待确认，不改写'],['[data-final="agent-confirm"]','确认权在本人','确认后文字才允许入书']],
+   ioL:{n:'整理稿 · 3 处修改附依据',ag:'重复的金额属强调语气，保留'},
+   ioR:{n:'（待本人确认后可见）',ag:'未确认的整理稿不对协助端公开'},
+   xyL:{c:'生成整理稿并附判断',f:'整理页逐条列出「改了什么、为什么」',ag:'事实不一致进边注，不改写'},
+   xyR:{c:'预备边注并轨',f:'（待确认后体现）',ag:'边注与口述颗粒度不同，标待确认'},
+   agent:'小忆判断：去口头禅、留原话，依据全部公开',
+   jtbdL:'陈建华逐条核对整理稿。当他看到年份仍是自己说的「零一年」、每个修改都写着理由时，他敢把这段故事交给这本书——因为最终决定权在他手里。',
+   jtbdR:'陈思颖等父亲确认。当她看到进度停在「待本人确认」时，她知道决定权在父亲手里，自己只需要等。'},
+  {name:'父亲确认整理稿：保留自己的说法',focus:'L',L:`memoDemo.step('agent-confirm')`,
+   annosL:[['.agent-state','本人已确认','原话整理经过讲述者点头'],['[data-final="agent-save"]','准备保存','确认后可以保存到经历']],
+   ioL:{n:'逐句核查 · 已确认',ag:'重复金额保留为强调'},ioR:{n:'等待保存完成',ag:'确认权只在父亲端'},
+   xyL:{c:'记录本人确认',f:'整理页变为「已确认」',ag:'未确认边注仍留在边缘'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：整理稿通过本人确认后才能保存',
+   jtbdL:'陈建华看过整理依据，点「是，就这样」。他确认的是自己的原话，不是女儿替他写的版本。',jtbdR:'陈思颖看到父亲已经确认，等待他保存这件经历。'},
+  {name:'保存经历：原声和整理稿一起收好',focus:'L',L:`memoDemo.step('agent-save')`,
+   annosL:[['.success-orb','保存成功','原声和确认稿同时留在经历中']],
+   ioL:{n:'第一个出口订单 · 已保存',ag:'原声与整理稿双轨留档'},ioR:{n:'进度同步为已保存',ag:'协助端只能查看确认内容'},
+   xyL:{c:'保存这件经历',f:'成功页提示「按你确认的说法收好了」',ag:'原话可随时回看'},xyR:{c:'同步保存状态',f:'进度页更新',ag:'协助端不改正文'},
+   agent:'小忆判断：保存后在经历列表和照片时间轴均可回看',
+   jtbdL:'陈建华点「保存这件经历」，看到成功提示。他还可以从经历里找回原话和照片。',jtbdR:'陈思颖知道这段讲述已收好，可以继续帮忙排版。'},
+  {name:'经历：打开故事列表',focus:'L',L:`memoDemo.step('stories-list')`,
+   annosL:[['.view-switch','两种回看方式','故事列表与照片时间轴可切换'],['.event-card','已保存的经历','第一个出口订单在列表中']],
+   ioL:{n:'故事列表 · 第一个出口订单',ag:'按事件归档确认稿'},ioR:{n:'（同步已保存状态）',ag:'不改变父亲的经历列表'},
+   xyL:{c:'归入经历列表',f:'「华辰第一个出口订单」卡片出现',ag:'仍保留原始语音入口'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：保存不是终点，之后要能轻松找回来',
+   jtbdL:'陈建华点底部「经历」，看到按事件排好的故事列表，刚保存的出口订单就在其中。',jtbdR:'陈思颖知道父亲可以自己回看，不用由她转发文稿。'},
+  {name:'展开故事：看原话整理和原始录音',focus:'L',L:`memoDemo.step('story-open')`,
+   annosL:[['.event-card .event-body','原话整理','展开后直接看到本人确认过的文字'],['[data-extra="segments"]','原始录音入口','可按段回听，不丢原声']],
+   ioL:{n:'出口订单 · 原话整理已展开',ag:'原声与整理稿并存'},ioR:{n:'（只读确认内容）',ag:'不替本人修改'},
+   xyL:{c:'展开已保存故事',f:'整理后的原话与原始录音入口',ag:'修改仍需本人操作'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：每段整理稿都能回到原始声音',
+   jtbdL:'陈建华展开「第一个出口订单」，看见自己的原话整理；需要时还能点进逐段录音。',jtbdR:'陈思颖看到的是经父亲确认过的内容。'},
+  {name:'切到照片时间轴：沿年份翻看',focus:'L',L:`memoDemo.step('stories-timeline')`,
+   annosL:[['.timeline-track','照片沿时间移动','复原的旧全家福进入时间轴'],['.timeline-photo.active','当前照片放大','选中后故事文字随照片更新']],
+   ioL:{n:'照片时间轴 · 旧全家福',ag:'照片与对应经历一起回看'},ioR:{n:'女儿上传的复原照已同步',ag:'素材来源有记录'},
+   xyL:{c:'沿时间呈现照片',f:'照片滑动并放大，文字卡随之更新',ag:'照片不自动改写故事'},xyR:{c:'同步照片来源',f:'复原照标明来自协助端',ag:'保留原片'},
+   agent:'小忆判断：故事列表看原话，时间轴看照片，两种入口指向同一段经历',
+   jtbdL:'陈建华切到「照片时间轴」，照片沿年份滑动，女儿修好的旧全家福停在中间，旁边出现对应的回忆文字。',jtbdR:'陈思颖看到自己修复的照片已进入父亲的经历视图。'},
+  {name:'女儿核对：边注有没有被采纳',focus:'R',R:`route('draftview')`,
+   annosR:[['.agent-state','状态机可见','原声 → 整理 → 本人确认，三态可追踪'],['.agent-decisions .uncertain-note','权限分层','协助者可见已确认内容，不可改动']],
+   ioR:{n:'边注已校核 · 一项待单据核对',ag:'经本人确认的句子才对女儿可见'},
+   ioL:{n:'经历已保存 · 章节待排版',ag:'原话已确认'},
+   xyR:{c:'展示确认稿与边注状态',f:'文稿页边注小字高亮',ag:'协助者不改动已确认文字'},
+   xyL:{c:'保留本人确认稿',f:'经历列表可回看',ag:'确认动作只能来自本人'},
+   agent:'小忆判断：边注并入文稿边缘，不进正文',
+   jtbdR:'陈思颖打开父亲确认过的文稿。当她补充的信息出现在文稿边缘的待核对区时，她知道自己是真的帮上了忙——但她看到的每一句正文，都经过父亲点头。',
+   jtbdL:'陈建华的文稿被女儿看到了。当他知道女儿看到的每句都经自己确认过时，他不担心「话被改走样」。'}]},
+ {id:'3',name:'合成文稿',paper:'final',flash:true,steps:[
+  {name:'成稿：第二章写入《工作回忆》',focus:'both',L:`route('record-done')`,R:`route('draftview')`,
+   annosL:[['.success-orb','双轨存档','原声与确认稿一起入章节']],
+   annosR:[['.agent-draft','署名分层','口述与协助各有署名，不混淆']],
+   ioL:{n:'6 段原声 · 全部本人确认 ✓',ag:'原话为主干'},
+   ioR:{n:'照片 ×2 · 边注 ×2 · 人物 2 位',ag:'素材是经纬，不喧宾夺主'},
+   xyL:{c:'通知成稿',f:'保存成功页「这段讲好了」',ag:'待确认项留在边注，不进正文'},
+   xyR:{c:'通知成稿',f:'进度页本章变「已成稿」',ag:'两端的内容各有署名'},
+   agent:'小忆判断：合成以原话为主干，待确认项不进正文',
+   jtbdL:'陈建华看到散话变成一页像样的文字。当文稿里全是他的语气、照片也排了进去时，他觉得这本书是他的——不是机器写的，是他讲的。',
+   jtbdR:'陈思颖看到这章成了。当她上传的照片成为章节配图时，她知道两代人的记忆合在了一起，各归各位。'}]},
+ {id:'4',name:'画布与成册',paper:'final',steps:[
+  {name:'女儿：画布上拖着排',focus:'R',R:`state.uploadSheet=false;route('canvas')`,
+   annosR:[['.cv-block[data-bid="photo"]','自由画布','素材块可拖动，版面即所得'],['[data-dual="canvas-arrange"]','agent 排版建议','按时间线一键成版，可再手调'],['.cv-gen','版面与文字分层','排版不改任何已确认文字']],
+   ioR:{n:'素材 5 块：照片 / 人物 / 原话 / 边注 / 复原照',ag:'画布只排版面，不改已确认文字'},
+   ioL:{n:'（等待新版面同步）',ag:'内容不动，只换排法'},
+   xyR:{c:'提供排列建议',f:'「自动排列」一键成版',ag:'阅读顺序按时间线推荐'},
+   xyL:{c:'预备同步新版面',f:'（生成后书页换排版）',ag:'版面与文字分两层管理'},
+   agent:'小忆判断：排版是协助者的自由，文字是讲述者的主权',
+   jtbdR:'陈思颖想把这章排得好看。她看到照片、人物、原话和边注各占一块，可以像摆桌面照片一样拖动，决定阅读顺序。',
+   jtbdL:'陈建华不用管排版。当他下次翻开书时，页面已经变好看了——他不感兴趣的事，不需要他参与。'},
+  {name:'一键排版：素材按阅读顺序归位',focus:'R',R:`state.uploadSheet=false;route('canvas');document.querySelector('[data-dual="canvas-arrange"]')?.click()`,
+   annosR:[['.cv-area','自动排列后的画布','照片、人物、原话和边注按阅读顺序归位'],['.cv-gen','准备生成章节','仍可继续手动调整版面']],
+   ioL:{n:'正文保持本人确认的版本',ag:'自动排列不改文字'},
+   ioR:{n:'画布素材自动归位',ag:'按时间与阅读顺序建议排版'},
+   xyL:{c:'等待新版面同步',f:'已确认正文不变',ag:'文字与版面分层'},
+   xyR:{c:'计算素材阅读顺序',f:'画布块移动到建议位置',ag:'排完仍可手动拖动'},
+   agent:'小忆判断：只调整素材位置，不改本人确认的内容',
+   jtbdL:'陈建华继续用自己的话讲述。版面调整不会改变他的原话。',
+   jtbdR:'陈思颖点「自动排列」，看着画布上的素材块移动到建议位置。她仍能拖动每一块，直到版面满意。'},
+  {name:'一键成章：画布素材汇入书页',focus:'R',R:`document.querySelector('[data-dual="canvas-generate"]')?.click()`,
+   annosR:[['.cv-gen','生成这一章','点击后素材汇入书页，出现生成过程']],
+   ioL:{n:'等待成章结果同步',ag:'生成过程不改已确认正文'},
+   ioR:{n:'按下「生成这一章」',ag:'画布素材与确认稿合成章节'},
+   xyL:{c:'准备同步章节',f:'成章后书架更新',ag:'本人确认稿保留'},
+   xyR:{c:'合成书页',f:'画布聚合动效 → 章节阅读页',ag:'生成一次，写入同一本书'},
+   agent:'小忆判断：画布的排列写成书页，确认过的文字保持原样',
+   jtbdL:'陈建华的正文已经确认，女儿排版时不会替他改字。',
+   jtbdR:'陈思颖按下「生成这一章」。素材在画布中央聚合，随后跳转到新章节的书页预览。'},
+  {name:'成章完成：新章节写入两端书架',focus:'both',paper:'book',anim:'book',
+   L:`route('books')`,
+   annosL:[['.book-shelf','成册入架','章节生成后自动写入两端书架']],
+   annosR:[['.reader-final','成章预览','新章节已可翻阅，写回《工作回忆》']],
+   ioL:{n:'书架出现新版章节',ag:'成册结果两端同步'},
+   ioR:{n:'画布素材 → 书页',ag:'生成只读素材，不再改字'},
+   xyL:{c:'把新章节放上书架',f:'书脊变厚，可翻开',ag:'成册后仍可继续编辑'},
+   xyR:{c:'通知成册',f:'书架同一本书同步更新',ag:'两端看的是同一个版本'},
+   agent:'小忆判断：成册是里程碑，但不是终点——之后仍可编辑',
+   jtbdL:'陈建华看到自己的章节变成书架上的一本真书。当他摸到封面、翻开书页时，散落的讲述终于有了「家」——书是可以捧在手里的。',
+   jtbdR:'陈思颖看到新章节的阅读页。画布上的素材已经合成书页，并与父亲端同一本《工作回忆》同步。'},
+  {name:'书架里继续改：父亲原位编辑',focus:'L',paper:'book',L:`state.bookId='work';state.fullPageIndex=1;route('fullpage')`,
+   annosL:[['.fullpaper','纸页隐喻','整页预览，像一页纸'],['[data-final="edit-page"]','原位编辑','书页上直接改字，不跳出阅读'],['.xy-chat','随时可补','页边小忆气泡继续补细节']],
+   ioL:{n:'看到一句「不像自己说的」',ag:'原位编辑只改正文，原声留档不动'},
+   ioR:{n:'（书架同步「修改中」）',ag:'修改期间锁定下单'},
+   xyL:{c:'提供本页补充入口',f:'书页下小忆气泡「还想补点什么吗」',ag:'补写仍走确认流程'},
+   xyR:{c:'同步修改状态',f:'书脊标「修改中」',ag:'定稿前不进入制作'},
+   agent:'小忆判断：成册后仍可编辑，编辑不跳出书页',
+   jtbdL:'陈建华翻书时看到一句「不像自己说的」。当他想改时，点「编辑本页」像改一张纸一样直接在书页上改，改完点保存——不用学任何新东西。',
+   jtbdR:'陈思颖顺手翻同一本书。当她看到父亲的修改时，她知道哪些页已经定了稿——两端看的是同一本书。'},
+  {name:'和小忆对话修改：说一句话就改',focus:'L',paper:'book',L:`state.bookId='work';state.fullPageIndex=1;route('fullpage')`,
+   annosL:[['.xy-chat','对话式修改','对小忆说要补什么，agent 落笔成文'],['.fullpaper-text','改动可见','补写内容就地呈现在书页上']],
+   ioL:{n:'「再补一句码头那天的心情」',ag:'对话修改仍走本人确认流程'},
+   ioR:{n:'（修改记录同步可见）',ag:'协助端看到修改轨迹'},
+   xyL:{c:'把口语补充转为书页文字',f:'小忆气泡对话，确认后落笔',ag:'口语→文字的转换保留本人语气'},
+   xyR:{c:'记录修改轨迹',f:'书架章节标「有更新」',ag:'修改历史可追溯、可回退'},
+   agent:'小忆判断：对话是最低门槛的编辑方式，落笔前必确认',
+   jtbdL:'陈建华翻书时想起一个细节。当他懒得打字时，他直接对小忆说「再补一句码头那天的心情」——小忆复述给他听，他点头后才写进书页。',
+   jtbdR:'陈思颖看到章节标了「有更新」。当她好奇父亲补了什么时，点开就能看到修改轨迹——补充始终来自父亲本人。'},
+  {name:'女儿：同一本书，随时翻开',focus:'R',paper:'book',R:`route('books')`,
+   annosR:[['.book-shelf','协助端书架','同一本书，两端同步可见可翻']],
+   ioR:{n:'翻到刚成册的第二章',ag:'两端内容实时一致'},
+   ioL:{n:'（父亲的书架同步）',ag:'无版本分叉'},
+   xyR:{c:'同步最新书页',f:'书架书籍更新',ag:'单一数据源，无冲突'},
+   xyL:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：两端一本书，永远同一个版本',
+   jtbdR:'陈思颖在自己的书架翻开同一本书。当她想确认排版效果时，她看到的就是父亲手里的版本——没有「我这边还没更新」的问题。',
+   jtbdL:'陈建华的书架和女儿的书架是同一本书。当他知道女儿看到的就是自己确认的版本时，他放心。'}]},
+ {id:'5',name:'广场',paper:'book',steps:[
+  {name:'讲述端：刷到高赞章节与同龄人',focus:'L',L:`memoDemo.step('community')`,
+   annosL:[['[data-id="jianguo"][data-extra="community"]','高赞章节参考','李建国的《黑土地上的青春》有 412 次喜欢'],['.moment-card','同龄人故事','从熟悉年代发现值得交流的人']],
+   ioL:{n:'看到李建国的高赞故事',ag:'按同龄经历推荐'},ioR:{n:'（协助端稍后学习文风）',ag:'两端广场各有用途'},
+   xyL:{c:'推荐同龄人的章节',f:'故事动态显示高赞回忆册',ag:'推荐依据是题材与年代'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：高赞故事先帮助讲述者发现可以交流的人',
+   jtbdL:'陈建华在广场刷到李建国讲北大荒的故事。年代相近，他想点进去看看这个人。',jtbdR:'陈思颖稍后会从故事里挑一种适合整理父亲原话的文风。'},
+  {name:'点开高赞故事：看人和章节',focus:'L',L:`memoDemo.step('community-detail')`,
+   annosL:[['.community-book-preview','章节预览','点进故事后看书页和评论'],['.community-follow-action','关注入口','喜欢这位讲述者，可先关注再对话']],
+   ioL:{n:'李建国 · 黑土地上的青春',ag:'章节、照片和评论同页展示'},ioR:{n:'（协助端未操作）',ag:'不影响父亲浏览'},
+   xyL:{c:'展开高赞章节',f:'人物详情 + 回忆册节选',ag:'只作参考，不改自己的书'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：先看完整故事，再决定是否关注',
+   jtbdL:'陈建华点进李建国的故事，翻到章节预览和评论，认出一些熟悉的年代细节。',jtbdR:'陈思颖暂时不干预父亲的浏览。'},
+  {name:'关注讲述者：保留交流入口',focus:'L',L:`memoDemo.step('community-follow')`,
+   annosL:[['.community-follow-action','已关注','关注后出现「去对话」入口']],
+   ioL:{n:'已关注李建国',ag:'关注只建立本地演示关系'},ioR:{n:'（无操作）',ag:'不代表女儿关注'},
+   xyL:{c:'保存关注关系',f:'按钮变为「已关注 · 去对话」',ag:'对话由本人主动进入'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：看完故事后由本人决定要不要继续交流',
+   jtbdL:'陈建华点「关注李建国」，以后想再看这个故事或交流时，不用重新寻找。',jtbdR:'陈思颖的操作不受影响。'},
+  {name:'进入关注对话：聊聊共同记忆',focus:'L',L:`memoDemo.step('community-chat')`,
+   annosL:[['.friend-bubbles','关注后的对话','进入李建国的本地对话预览'],['.friend-books','分享自己的书','可以选择一页回忆册作为话题']],
+   ioL:{n:'李建国的对话页',ag:'是否发话由本人决定'},ioR:{n:'（无操作）',ag:'对话内容不进入章节'},
+   xyL:{c:'打开关注对话',f:'对话气泡 + 分享书页入口',ag:'广场交流与正文分开'},xyR:{c:'（待命）',f:'—',ag:'无新指令'},
+   agent:'小忆判断：广场交流是独立互动，不会自动写入回忆录',
+   jtbdL:'陈建华从「已关注」进入李建国的对话页，看见对方分享的回忆册，也可以拿自己的一页故事继续聊。',jtbdR:'陈思颖不参与父亲和听友的对话。'},
+  {name:'协助端：小忆学习喜欢的故事文风',focus:'R',R:`memoDemo.step('helper-style')`,
+   annosR:[['.btn-style.learned','小忆学习文风','点「学习文风」，整理时参考短句白描'],['.style-chips','偏好已经记下','文风偏好只影响以后整理，不改已确认稿']],
+   ioL:{n:'（父亲的广场对话继续保留）',ag:'文风选择不改已保存故事'},ioR:{n:'学习「短句白描」文风',ag:'只学写法，不复制故事'},
+   xyL:{c:'保留原稿',f:'已确认文字保持原样',ag:'协助端无权改写'},xyR:{c:'记录文风偏好',f:'小忆气泡出现「短句白描」',ag:'后续整理参考，内容仍由父亲确认'},
+   agent:'小忆判断：协助端学习故事文风，讲述端保留自己的原话',
+   jtbdL:'陈建华继续在广场和听友交流，自己的章节文字不被改变。',jtbdR:'陈思颖在广场看到喜欢的讲述方式，点「学习文风」。小忆只记住短句白描的感觉，后续整理仍要父亲确认。'}]},
+ {id:'6',name:'双端购买',paper:'book',steps:[
+  {name:'女儿下单：把书印出来',focus:'R',R:`state.orderBook='work';route('order')`,
+   annosR:[['.option-row','多形态成品','精装 / 照片 / 声音版'],['.tier-row','册数与合计','一次下单，全家各一本'],['[data-extra="save-order"]','方案保存','确认后进入印制']],
+   ioR:{n:'精装 ×3 册',ag:'声音版自动挂上本人原声段落'},
+   ioL:{n:'（书架将挂「印制中」）',ag:'成品进度对本人可见'},
+   xyR:{c:'关联原声到声音版',f:'下单页标「含 6 段原声」',ag:'原声属本人，仅授权家用'},
+   xyL:{c:'同步下单进度',f:'（下一步体现）',ag:'到书提醒不过度推送'},
+   agent:'小忆判断：声音版自动关联已确认的原声',
+   jtbdR:'陈思颖赶在父亲生日前下单。当她一次选好版本和册数时，这本书就成了拿在手里的礼物——父母的、兄妹的，一次都安排好。',
+   jtbdL:'陈建华等着收书。当他知道书正在印时，这辈子讲的话就要变成家里的东西了。'},
+  {name:'父亲也能买：两端同权',focus:'L',L:`state.orderBook='work';route('order')`,
+   annosL:[['.option-row','两端同权购买','讲述者也可直接下单'],['.price-total','价格透明','版本册数实时合计']],
+   ioL:{n:'声音版 ×1 · 自己下单',ag:'购买不依赖子女'},
+   ioR:{n:'（女儿看到新订单）',ag:'订单两端可见，避免重复'},
+   xyL:{c:'提供讲述端下单入口',f:'书架「成品」按钮直达',ag:'老人常用版本置顶推荐'},
+   xyR:{c:'同步订单状态',f:'进度页「已下单成品」',ag:'重复下单自动提示'},
+   agent:'小忆判断：购买权两端同权，订单互相可见',
+   jtbdL:'陈建华想给老战友也寄一本。当他不想麻烦女儿时，自己在书架上点「成品」就能下单——买书这件事，他自己也能办。',
+   jtbdR:'陈思颖看到父亲自己下了一单。当她担心重复购买时，订单状态两端可见——谁买了什么，一目了然。'}]},
+ {id:'∞',name:'自由使用',paper:'book',free:true,steps:[
+  {name:'离开任务线，两端各自可用',focus:'both',L:`state.route='home';render()`,R:`state.uploadSheet=false;state.route='home';render()`,
+   annosL:[['.direct-record','独立可用','讲述 / 修复 / 广场 / 书架不依赖任务线']],
+   annosR:[['.chap-card','独立可用','进度 / 上传 / 画布 / 下单随时进入']],
+   ioL:{n:'想讲就讲，想听就听',ag:'无任务时每日一个新问题'},
+   ioR:{n:'随时打开随时接着做',ag:'章节状态长期保存'},
+   xyL:{c:'日常待命',f:'首页小忆气泡每日一新问',ag:'无任务线也保持轻节奏'},
+   xyR:{c:'长期保存进度',f:'进度页随时继续',ag:'一端离线，重连后合入同一章节'},
+   agent:'任何一端离线，另一端的记录保留，重连后合入同一章节',
+   jtbdL:'陈建华不按流程也能用。当他某天只想翻翻书、听听故事时，不需要任何人配合——书一直在那里。',
+   jtbdR:'陈思颖不按流程也能用。当她隔了两周再打开时，进度、画布、订单都还在——随时接着做。'}]}];
+
+/* ===== 驱动 ===== */
+const $=s=>document.querySelector(s);
+$('#nodes').innerHTML=NODES.map((n,i)=>`<button class="nodebtn ${n.free?'free':''}" data-i="${i}"><b>${n.id}</b>${n.name}</button>`).join('');
+let ni=0,si=0,driveToken=0;
+function scheduleDrive(f,side,js,scr,tok,attempt=0){
+  if(!js&&!scr)return;
+  setTimeout(()=>{
+    if(tok!==driveToken)return;
+    if(SRC_MODE===null)detectMode(f);
+    if(!SRC_MODE){
+      try{if(f.contentDocument.readyState!=='complete'&&attempt<15)return scheduleDrive(f,side,js,scr,tok,attempt+1);}catch(e){}
+    }
+    drive(f,side,js,scr);
+  },attempt?150:350);
+}
+function ioHtml(side,d){
+  const hd=side==='L'?`<img src="${AV}narrator.png">父亲 · 原声输入`:`<img src="${AV}role-helper.png">女儿 · 线索输入`;
+  return `<h4>${hd}</h4>${d.q?`<div class="quote">${d.q}</div>`:''}<div class="note">${d.n}</div><div class="ag"><b>agent</b> · ${d.ag}</div>`;
+}
+function xyHtml(side,d){
+  const hd=side==='L'?'→ 讲述端小忆':'→ 协助端小忆';
+  return `<h5><i>忆</i>${hd}</h5><b>指令</b>：${d.c}<br><b>体现</b>：${d.f}<div class="ag"><b>判断</b> · ${d.ag}</div>`;
+}
+function applyStep(){
+  const n=NODES[ni],s=n.steps[si];
+  document.querySelectorAll('.nodebtn').forEach((b,k)=>b.classList.toggle('on',k===ni));
+  const fL=$('#fL'),fR=$('#fR');
+  const doL=s.focus!=='R',doR=s.focus!=='L';
+  /* 选身份/进入身份：整页换 src（任何模式都能切） */
+  if(s.srcL&&fL.dataset.cur!==s.srcL){fL.dataset.cur=s.srcL;fL.dataset.scr='';fL.src=APPURL+s.srcL;}
+  if(s.srcR&&fR.dataset.cur!==s.srcR){fR.dataset.cur=s.srcR;fR.dataset.scr='';fR.src=APPURL+s.srcR;}
+  const scr=SCR[ni+'-'+si]||{};
+  const jsL=doL?s.L:s.alsoL, jsR=doR?s.R:s.alsoR;
+  // 每个按钮动作只执行一次；切换身份后等待 iframe 页面加载完成。
+  const dt=++driveToken;
+  scheduleDrive(fL,'L',jsL,scr.L,dt);
+  scheduleDrive(fR,'R',jsR,scr.R,dt);
+  // 浮窗：先立即清掉旧的，渲染稳定后只放一次（令牌防止上一步的迟放造成二次闪现）
+  ['#phL','#phR'].forEach(p=>{$(p).querySelectorAll('.anno,.hitdot,.conn').forEach(e=>e.remove());});
+  const tok=++annoToken;
+  setTimeout(()=>{if(tok!==annoToken)return;
+    const mL=placeAnnos(fL,$('#phL'),doL?s.annosL:null,'out-r');
+    const mR=placeAnnos(fR,$('#phR'),doR?s.annosR:null,'out-l');
+    /* 分阶段页面（如修复中/生成中）目标元素稍晚才出现：有缺失则 2.4s 后无动画补放一次 */
+    if(mL+mR>0)setTimeout(()=>{if(tok!==annoToken)return;
+      ['#phL','#phR'].forEach(p=>{$(p).querySelectorAll('.anno,.hitdot,.conn').forEach(e=>e.remove());});
+      placeAnnos(fL,$('#phL'),doL?s.annosL:null,'out-r',true);
+      placeAnnos(fR,$('#phR'),doR?s.annosR:null,'out-l',true);
+    },2400);
+  },1050);
+  // 非操作端压暗，视线聚焦本步操作端
+  $('#phL').classList.toggle('dim',s.focus==='R');
+  $('#phR').classList.toggle('dim',s.focus==='L');
+  $('#jtbdL').innerHTML='<b>讲述端</b> · '+s.jtbdL;
+  $('#jtbdR').innerHTML='<b>协助端</b> · '+s.jtbdR;
+  $('#stName').textContent=`节点 ${n.id} · ${n.name} ｜ ${s.name}`;
+  $('#stSide').textContent=s.focus==='L'?'本步：讲述端':s.focus==='R'?'本步：协助端':'本步：两端';
+  $('#dots').innerHTML=n.steps.map((_,k)=>`<i class="${k===si?'on':''}"></i>`).join('');
+  $('#agentNote').innerHTML=s.agent?`<b>agent</b> · ${s.agent}`:'';
+  $('#ioL').innerHTML=ioHtml('L',s.ioL);$('#ioR').innerHTML=ioHtml('R',s.ioR);
+  $('#xyL').innerHTML=xyHtml('L',s.xyL);$('#xyR').innerHTML=xyHtml('R',s.xyR);
+  /* 文稿 / 成册 */
+  const pk=s.paper||n.paper;
+  const p=$('#paper');
+  if(pk==='book'){
+    if(!bookShown){
+      /* 首次进入成册阶段才渲染书；之后的书静态保留，不再重建 */
+      p.classList.add('bookmode');p.innerHTML=PAPERS.book;
+      if(s.anim==='book'&&!bookOpened){bookOpened=true;playBookAnim();}
+      else{hideMerge();const b=document.getElementById('book3d');if(b)b.classList.add('open');}
+      bookShown=true;
+    }else{hideMerge();}
+  }else{
+    bookShown=false;bookOpened=false;
+    p.classList.remove('bookmode');p.innerHTML=PAPERS[pk];resetMerge();
+    if(n.flash){p.classList.remove('flash');void p.offsetWidth;p.classList.add('flash');}
+  }
+}
+function go(ni2,si2){ni=Math.max(0,Math.min(NODES.length-1,ni2));si=Math.max(0,Math.min(NODES[ni].steps.length-1,si2));applyStep();}
+$('#nodes').addEventListener('click',e=>{const b=e.target.closest('.nodebtn');if(b){stopAuto();go(Number(b.dataset.i),0);}});
+$('#prev').addEventListener('click',()=>{stopAuto();si>0?go(ni,si-1):go(ni-1,NODES[Math.max(0,ni-1)].steps.length-1);});
+$('#next').addEventListener('click',()=>{stopAuto();si<NODES[ni].steps.length-1?go(ni,si+1):go(ni+1,0);});
+let auto=null;
+function stopAuto(){if(auto){clearInterval(auto);auto=null;$('#autoplay').textContent='▶ 自动演示全流程';$('#autoplay').classList.remove('playing');}}
+$('#autoplay').addEventListener('click',()=>{
+  if(auto)return stopAuto();
+  $('#autoplay').textContent='■ 停止';$('#autoplay').classList.add('playing');
+  go(0,0);
+  auto=setInterval(()=>{if(si<NODES[ni].steps.length-1){si++;}else if(ni<NODES.length-1){ni++;si=0;}else{stopAuto();return;}applyStep();},3000);
+});
+let loaded=0,booted=false;
+function boot(){inject($('#fL'));inject($('#fR'));if(booted)return;if(++loaded>=2){booted=true;setTimeout(()=>applyStep(),500);}}
+$('#fL').addEventListener('load',boot);$('#fR').addEventListener('load',boot);
+$('#fL').dataset.cur='fresh=1';$('#fR').dataset.cur='fresh=1';
+</script>
+</body>
+</html>

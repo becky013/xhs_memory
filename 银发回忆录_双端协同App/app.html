@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f3eb">
+  <title>银发回忆录 · 双身份协同</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style-final.css">
+  <link rel="stylesheet" href="dual.css">
+</head>
+<body>
+  <div class="stage">
+    <div class="stage-caption"><span>银发回忆录</span><small>双身份协同 · 讲述者与协助者</small></div>
+    <div class="phone" aria-label="iPhone 原型">
+      <div class="side-button side-button-left"></div><div class="side-button side-button-right"></div>
+      <div class="device-screen">
+        <div class="dynamic-island"></div>
+        <div class="status-bar"><span id="clock">9:41</span><div class="status-icons"><svg viewBox="0 0 35 16" aria-hidden="true"><path d="M1 14h3V9H1zm5 0h3V6H6zm5 0h3V3h-3zm5 0h3V1h-3z" fill="currentColor"/><path d="M23 3a12 12 0 0 1 10 0M25 6a9 9 0 0 1 6 0M27 9a5 5 0 0 1 2 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><svg viewBox="0 0 25 13" aria-hidden="true"><rect x=".7" y=".7" width="21" height="11.6" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2.8" y="2.8" width="17" height="7.4" rx="1.7" fill="currentColor"/><rect x="22.8" y="4" width="2" height="5" rx="1" fill="currentColor" opacity=".45"/></svg></div></div>
+        <main id="viewport" class="viewport" aria-live="polite"></main>
+        <nav id="tabbar" class="tabbar" aria-label="主要页面"></nav>
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+    <div class="stage-note">选择身份进入，画布中的素材块可以直接拖动</div>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js"></script>
+  <script src="app-extra.js"></script>
+  <script src="app-final.js"></script>
+  <script src="book-content.js"></script>
+  <script src="dual.js"></script>
+</body>
+</html>
